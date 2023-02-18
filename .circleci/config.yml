@@ -7,7 +7,7 @@ jobs:
     docker:
       - image: cimg/python:3.11.1
       # Service container image
-      - image: cimg/postgres:13.0
+      - image: cimg/postgres:14.0
         environment:
           POSTGRES_DB: devdb
           POSTGRES_USER: devuser
@@ -26,14 +26,15 @@ jobs:
           command: |
             python3 -m venv venv
             . venv/bin/activate
+            cd api
             pip install -r requirements.txt
             pip install -r requirements.dev.txt
       - save_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          key: deps1-{{ .Branch }}-{{ checksum "api/requirements.txt" }}
           paths:
             - "venv"
       - save_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "requirements.dev.txt" }}
+          key: deps1-{{ .Branch }}-{{ checksum "api/requirements.dev.txt" }}
           paths:
             - "venv"
       - run:
