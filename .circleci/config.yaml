@@ -1,0 +1,55 @@
+version: 2.1
+orbs:
+  python: circleci/python@1.5.0
+
+jobs:
+  build-and-test:
+    docker:
+      - image: cimg/python:3.11.1
+      # Service container image
+      - image: cimg/postgres:13.0
+        environment:
+          POSTGRES_DB: devdb
+          POSTGRES_USER: devuser
+          POSTGRES_PASSWORD: devpass
+          POSTGRES_PORT: 5432
+          POSTGRES_URL: postgresql://root@localhost/circle_test?sslmode=disable
+          POSTGRES_HOST: localhost
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt-get install postgresql-client
+      - run: whoami
+      - python/install-packages:
+          pkg-manager: pip
+      - run:
+          command: |
+            python3 -m venv venv
+            . venv/bin/activate
+            pip install -r requirements.txt
+            pip install -r requirements.dev.txt
+      - save_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "requirements.txt" }}
+          paths:
+            - "venv"
+      - save_cache:
+          key: deps1-{{ .Branch }}-{{ checksum "requirements.dev.txt" }}
+          paths:
+            - "venv"
+      - run:
+          name: Running tests
+          command: |
+            . venv/bin/activate
+            cd api/src
+            python3 manage.py wait_for_db
+            python3 -m pytest
+            python3 -m flake8
+      - store_artifacts:
+          path: test-reports/
+          destination: python_app
+
+workflows:
+  image-api-test: # This is the name of the workflow, feel free to change it to better match your workflow.
+    # Inside the workflow, you define the jobs you want to run.
+    jobs:
+      - build-and-test
