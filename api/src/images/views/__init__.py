@@ -1,1 +1,1 @@
-from .image import ImageUploadView
+from .image import ImageUploadView  # noqa

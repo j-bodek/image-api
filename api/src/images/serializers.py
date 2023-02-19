@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from core import models
+from core import models, validators
 import uuid
 
 
@@ -13,20 +13,22 @@ class ThumbnailSerializer(serializers.ModelSerializer):
         fields = ("height", "width")
 
 
-class ImageSerializer(serializers.ModelSerializer):
+class ImageCreateSerializer(serializers.ModelSerializer):
     """
     Class used as Image Serializer
     """
 
     uuid = serializers.UUIDField(default=lambda: uuid.uuid4())
-    thumbnails = ThumbnailSerializer(source="image.thumbnails", read_only=True)
+    file = serializers.ImageField(
+        source="og_file", validators=[validators.img_extension_validator], required=True
+    )
 
     class Meta:
         model = models.Image
         fields = (
             "uuid",
             "name",
-            "og_file",
+            "file",
             "uploaded_at",
             "thumbnails",
         )
