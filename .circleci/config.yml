@@ -20,18 +20,12 @@ jobs:
       - run: sudo apt-get update
       - run: sudo apt-get install postgresql-client
       - run: whoami
-      - restore_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "api/requirements.txt" }}
-      - restore_cache:
-          key: deps1-{{ .Branch }}-{{ checksum "api/requirements.dev.txt" }}
       - python/install-packages:
+          pip-dependency-file: api/requirements.txt
           pkg-manager: pip
-      - run:
-          command: |
-            python3 -m venv venv
-            . venv/bin/activate
-            pip install -r api/requirements.txt
-            pip install -r api/requirements.dev.txt
+      - python/install-packages:
+          pip-dependency-file: api/requirements.dev.txt
+          pkg-manager: pip
       - save_cache:
           key: deps1-{{ .Branch }}-{{ checksum "api/requirements.txt" }}
           paths:
