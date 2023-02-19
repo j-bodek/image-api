@@ -27,13 +27,15 @@ SECRET_KEY = "django-insecure-^*9ap-igvih8w$o@)04zrxn_u6#hz)c6)q5w(v2ekubx*wq8($
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["0.0.0.0"]
 
 
 # Application definition
 
 INSTALLED_APPS = [
     "core",
+    "images",
+    "rest_framework",
     "rest_framework_simplejwt",
     "drf_spectacular",
     "django.contrib.admin",
@@ -131,6 +133,9 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+MEDIA_URL = "/media/"
+
 # Define custom user model
 AUTH_USER_MODEL = "core.User"
 
@@ -144,5 +149,5 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=10),
-    "USER_ID_FIELD": "id",
+    "USER_ID_FIELD": "uuid",
 }

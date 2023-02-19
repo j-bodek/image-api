@@ -46,7 +46,7 @@ class Image(AbstractImage):
     og_file = models.ImageField(
         null=True,
         blank=True,
-        uploaded_to=get_upload_to,
+        upload_to=get_upload_to,
     )
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -69,10 +69,17 @@ class Thumbnail(AbstractImage):
     images and their data
     """
 
+    image = models.ForeignKey(
+        Image,
+        blank=False,
+        null=False,
+        on_delete=models.CASCADE,
+        related_name="thumbnails",
+    )
     height = models.IntegerField(null=True, blank=True)
     width = models.IntegerField(null=True, blank=True)
     file = models.ImageField(
         null=False,
         blank=False,
-        uploaded_to=get_upload_to,
+        upload_to=get_upload_to,
     )
