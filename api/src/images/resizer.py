@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Union, Iterator
 from src import REDIS
 from PIL import Image as PILImage
+import concurrent.futures
 import io
 import os
 
@@ -28,23 +29,29 @@ class ImageResizer:
         filename, {"height":new_height, "width":new_width}, img_bytes
         """
 
-        for thumbnail in self.thumbnails_data:
-            ext = os.path.splitext(thumbnail["file"])[1]
-            new_height, new_width = thumbnail["height"], thumbnail["width"]
-            yield thumbnail["file"], *self.resize_image(
-                self.image_uuid, ext, new_height, new_width
-            )
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            results = []
+            for thumbnail in self.thumbnails_data:
+                results.append(
+                    executor.submit(
+                        self.resize_image, image_uuid=self.image_uuid, **thumbnail
+                    )
+                )
+
+            # wait for functions to complete and yield their results
+            for f in concurrent.futures.as_completed(results):
+                yield f.result()
 
     def resize_image(
         self,
         image_uuid: str,
-        extension: str,
+        file: str,  # image name with extension (e.g. 'image.png')
         height: Union[str, None],
         width: Union[str, None],
     ) -> tuple[dict[str:int], bytes]:
         """
         Return resized version of image cached in redis and returns it as bytes
-        and it new sizes
+        ,it new sizes and filename
         """
 
         image = REDIS.get(image_uuid)
@@ -62,12 +69,13 @@ class ImageResizer:
             pass
 
         output = io.BytesIO()
+        extension = os.path.splitext(file)[1]
         image.save(
             output, format=self.__get_format(extension), optimize=True, quality=80
         )
         new_size = {"width": image.size[0], "height": image.size[1]}
 
-        return new_size, output.getvalue()
+        return file, new_size, output.getvalue()
 
     def __get_format(self, extension: str) -> str:
         """Used to get format used to save resized image to bytesIO"""

@@ -41,7 +41,7 @@ services:
         - DEV=true
     volumes:
       - "./api/src:/src"
-    command: celery -A src worker -l INFO
+    command: celery -A src worker -l INFO -P threads
     depends_on:
       - db
       - redis
