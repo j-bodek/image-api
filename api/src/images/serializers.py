@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from core import models, validators
+from images.tasks import thumbnails_creator
+from src import REDIS
 from typing import Iterator
 import os
 
@@ -12,7 +14,7 @@ class ThumbnailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Thumbnail
-        fields = ("height", "width")
+        fields = ("image", "height", "width", "file")
 
 
 class ImageCreateSerializer(serializers.ModelSerializer):
@@ -79,13 +81,13 @@ class ImageCreateSerializer(serializers.ModelSerializer):
         # get thumbnail sizes (without repeats)
         thumbnail_sizes = user.tier.sizes.values("height", "width").distinct()
         for size in thumbnail_sizes:
-            height = size["height"] or "auto"
             width = size["width"] or "auto"
+            height = size["height"] or "auto"
 
             yield {
-                "height": size["height"],
                 "width": size["width"],
-                "file": f"thumbnail-{height}x{width}{extension}",
+                "height": size["height"],
+                "file": f"thumbnail-{width}x{height}{extension}",
             }
 
     def create(self, validated_data: dict) -> models.Image:
@@ -96,6 +98,7 @@ class ImageCreateSerializer(serializers.ModelSerializer):
         user = self.context["request"].user
         extension = os.path.splitext(validated_data["og_file"].name)[1]
 
+        file = validated_data["og_file"]
         # if user doesn't have permission to access original image
         # delete it from validated_data in order to prevent saving it
         if user.tier is None or not user.tier.has_og_image_access:
@@ -103,9 +106,17 @@ class ImageCreateSerializer(serializers.ModelSerializer):
 
         instance = super().create(validated_data)
 
-        thumbnails_data = self.get_thumbnails_data(user, extension)
-        # # TODO cache image in redis
-        # # TODO run celery task
+        thumbnails_data = list(self.get_thumbnails_data(user, extension))
+
+        if thumbnails_data:
+            # cache image in redis for faster access in celery task
+            REDIS.set(str(instance.uuid), file.file.getvalue())
+
+            # run celery task
+            thumbnails_creator.delay(
+                image_uuid=str(instance.uuid), thumbnails_data=thumbnails_data
+            )
+            # result_output = result.wait(timeout=None, interval=0.5)
 
         # set thumbnails in validated_data
         self._validated_data["thumbnails"] = thumbnails_data
