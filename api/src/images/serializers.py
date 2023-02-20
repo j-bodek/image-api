@@ -116,7 +116,6 @@ class ImageCreateSerializer(serializers.ModelSerializer):
             thumbnails_creator.delay(
                 image_uuid=str(instance.uuid), thumbnails_data=thumbnails_data
             )
-            # result_output = result.wait(timeout=None, interval=0.5)
 
         # set thumbnails in validated_data
         self._validated_data["thumbnails"] = thumbnails_data

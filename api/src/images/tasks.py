@@ -2,10 +2,8 @@ import celery
 import logging
 from typing import Union
 from django.core.files.base import ContentFile
+from images.resizer import ImageResizer
 from src import CELERY_APP, REDIS
-from PIL import Image as PILImage
-import io
-import os
 
 
 class ThumbnailsCreator(celery.Task):
@@ -13,6 +11,8 @@ class ThumbnailsCreator(celery.Task):
     This Task is used to create thumbnails of image
     uploaded by user.
     """
+
+    max_retries = 0
 
     def run(
         self,
@@ -25,16 +25,16 @@ class ThumbnailsCreator(celery.Task):
         from images.serializers import ThumbnailSerializer
 
         try:
-            for thumbnail in thumbnails_data:
-                ext = os.path.splitext(thumbnail["file"])[1]
-                new_height, new_width = thumbnail["height"], thumbnail["width"]
-                img_bytes = self.__resize_image(image_uuid, ext, new_height, new_width)
-                image = ContentFile(img_bytes, name=thumbnail["file"])
+            image_resizer = ImageResizer(
+                image_uuid=image_uuid, thumbnails_data=thumbnails_data
+            )
+            for filename, size, img_bytes in image_resizer.resize():
+                image = ContentFile(img_bytes, name=filename)
                 serializer = ThumbnailSerializer(
                     data={
                         "image": image_uuid,
-                        "height": new_height,
-                        "width": new_width,
+                        "height": size["height"],
+                        "width": size["width"],
                         "file": image,
                     }
                 )
@@ -43,56 +43,6 @@ class ThumbnailsCreator(celery.Task):
         finally:
             # make sure that cached image is deleted from redis
             REDIS.delete(image_uuid)
-
-    def __resize_image(
-        self,
-        image_uuid: str,
-        extension: str,
-        height: Union[str, None],
-        width: Union[str, None],
-    ) -> bytes:
-        """Return resized version of image cached in redis and returns it as bytes"""
-
-        image = REDIS.get(image_uuid)
-        image = PILImage.open(io.BytesIO(image))
-        if None not in [height, width]:
-            image.resize((width, height), PILImage.ANTIALIAS)
-        elif [height, width].count(None) == 1:
-            scale_ratio = self.__get_resize_ratio(image.size, height, width)
-            image = image.resize(
-                (int(s * scale_ratio) for s in image.size), PILImage.ANTIALIAS
-            )
-        else:
-            # image remain as it was
-            pass
-
-        output = io.BytesIO()
-        image.save(
-            output, format=self.__get_format(extension), optimize=True, quality=80
-        )
-
-        return output.getvalue()
-
-    def __get_format(self, extension: str) -> str:
-        """Used to get format used to save resized image to bytesIO"""
-
-        return {
-            ".jpg": "JPEG",
-            ".jpeg": "JPEG",
-            ".png": "PNG",
-        }.get(extension.lower())
-
-    def __get_resize_ratio(
-        self,
-        basesize: tuple[int],  # (width, height)
-        newheight: Union[int, None],
-        newwidth: Union[int, None],
-    ) -> float:
-        """Returns resize ration, used when scaling image based only or height or width"""
-        height_ratio = None if newheight is None else newheight / basesize[1]
-        width_ratio = None if newwidth is None else newwidth / basesize[0]
-
-        return height_ratio or width_ratio
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """This method is called when task fails"""
