@@ -34,14 +34,12 @@ class ImageCreateSerializer(serializers.ModelSerializer):
             "uuid",
             "name",
             "uploaded_at",
-            "uploaded_by",
             "file",
             "og_file",
             "thumbnails",
         )
         read_only_fields = (
             "uploaded_at",
-            "uploaded_by",
             "og_file",
             "thumbnails",
         )

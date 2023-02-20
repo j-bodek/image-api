@@ -7,7 +7,7 @@ class OverwriteStorage(FileSystemStorage):
     """Overwrite FileSystemStorage class to overwrite
     file with same path. This storage is used to save images thumbnails"""
 
-    def get_available_name(self, name):
+    def get_available_name(self, name: str) -> str:
         """Returns a filename that's free on the target storage system, and
         available for new content to be written to.
         """
