@@ -15,11 +15,35 @@ class ThumbnailSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Thumbnail
         fields = ("image", "height", "width", "file")
+        extra_kwargs = {"image": {"write_only": True}}
+
+
+class ImageSerializer(serializers.ModelSerializer):
+    """
+    Serializer used to serialize many images (with thumbnails)
+    """
+
+    thumbnails = ThumbnailSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = models.Image
+        fields = (
+            "name",
+            "uploaded_at",
+            "og_file",
+            "thumbnails",
+        )
+        read_only_fields = (
+            "name",
+            "uploaded_at",
+            "og_file",
+            "thumbnails",
+        )
 
 
 class ImageCreateSerializer(serializers.ModelSerializer):
     """
-    Class used as Image Serializer
+    Serializer used to create images (with thumbnails)
     """
 
     file = serializers.ImageField(
@@ -33,7 +57,6 @@ class ImageCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Image
         fields = (
-            "uuid",
             "name",
             "uploaded_at",
             "file",
@@ -49,19 +72,21 @@ class ImageCreateSerializer(serializers.ModelSerializer):
     def get_thumbnails(self, obj: models.Image) -> dict:
         """Return serialized thumbnails data"""
 
+        if not obj:
+            return []
+
         try:
             self.validated_data["thumbnails"]
         except (KeyError, AssertionError):
             # if data wasn't validated yet or thumbnails doens't exists
             return []
 
-        uuid = str(self.data["uuid"])
         for data in self.validated_data["thumbnails"]:
             # update file to return url
             data.update(
                 {
                     "file": models.Thumbnail.generate_absolute_url(
-                        self.context["request"], uuid, data["file"]
+                        self.context["request"], str(obj.uuid), data["file"]
                     )
                 }
             )

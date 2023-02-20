@@ -21,7 +21,7 @@ class ImageResizer:
     """
 
     image_uuid: str
-    thumbnails_data: list[dict[str : Union[str, tuple]]]
+    thumbnails_data: list[dict[str : Union[str, tuple]]]  # noqa
 
     def resize(self) -> Iterator[tuple[dict[str:int], str, bytes]]:
         """
@@ -92,7 +92,10 @@ class ImageResizer:
         newheight: Union[int, None],
         newwidth: Union[int, None],
     ) -> float:
-        """Returns resize ration, used when scaling image based only or height or width"""
+        """
+        Returns resize ration, used when scaling image based only or height or width
+        """
+
         height_ratio = None if newheight is None else newheight / basesize[1]
         width_ratio = None if newwidth is None else newwidth / basesize[0]
 
