@@ -1,43 +1,39 @@
 from django.db import models
 from django.conf import settings
+from django.http import HttpRequest
+from core.storage import OverwriteStorage
 from core import validators
+from typing import Protocol
+import uuid
 import os
 
 
-class AbstractImage(models.Model):
-    """Define base abstract Image Model"""
-
-    folder_name = "images"
-
-    class Meta:
-        abstract = True
+class ImageModelProtocol(Protocol):
+    """Define Image Model interface"""
 
     def get_upload_to(self, filename: str) -> str:
-        """get path where images should be uploaded"""
-
-        filename = self.og_file.field.storage.get_valid_name(filename)
-        return os.path.join(self.folder_name, filename)
+        ...
 
 
-def get_upload_to(instance: AbstractImage, filename: str) -> str:
+def get_upload_to(instance: ImageModelProtocol, filename: str) -> str:
     """Return path to location where file should be uploaded"""
 
     return instance.get_upload_to(filename)
 
 
-class Image(AbstractImage):
+class Image(models.Model):
     """
     Model used to store uploaded images
     and their data
     """
 
-    # this field will be used to identify images
     uuid = models.UUIDField(
-        null=False,
-        blank=False,
+        primary_key=True,
         editable=False,
-        unique=True,
+        default=uuid.uuid4,
+        max_length=36,
     )
+
     name = models.CharField(
         null=False,
         blank=False,
@@ -63,8 +59,14 @@ class Image(AbstractImage):
     # class attributes
     folder_name = "original_images"
 
+    def get_upload_to(self, filename: str) -> str:
+        """get path where images should be uploaded"""
 
-class Thumbnail(AbstractImage):
+        filename = self.og_file.field.storage.get_valid_name(filename)
+        return os.path.join(self.folder_name, filename)
+
+
+class Thumbnail(models.Model):
     """
     This model is used to store resized
     images and their data
@@ -82,6 +84,33 @@ class Thumbnail(AbstractImage):
     file = models.ImageField(
         null=False,
         blank=False,
+        # this will make sure that images with same name will be overwritten,
+        # doing that we can be sure that file will be saved with provided filename
+        storage=OverwriteStorage(),
         upload_to=get_upload_to,
         validators=[validators.img_extension_validator],
     )
+
+    # class attributes
+    folder_name = "thumbnails"
+
+    @classmethod
+    def generate_absolute_url(
+        cls, request: HttpRequest, image_uuid: str, filename: str
+    ) -> str:
+        """Generates thumbnail absolute URL"""
+
+        path = cls.generate_upload_to(image_uuid, filename)
+        url = cls.file.field.storage.url(path)
+        return request.build_absolute_uri(url)
+
+    @classmethod
+    def generate_upload_to(cls, image_uuid: str, filename: str) -> str:
+        """Provide method that generates path of thumbnail and can be used on class"""
+
+        return os.path.join(cls.folder_name, image_uuid, filename)
+
+    def get_upload_to(self, filename: str) -> str:
+        """get path where thumbnail should be uploaded"""
+
+        return self.generate_upload_to(str(self.image.uuid), filename)

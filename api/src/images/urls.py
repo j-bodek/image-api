@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 from images import views as img_views
 
 app_name = "images"
