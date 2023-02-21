@@ -1,9 +1,11 @@
-from rest_framework import serializers
+from rest_framework import serializers, exceptions
 from django.contrib.auth import get_user_model
 from core import models, validators
 from images.tasks import thumbnails_creator
+from images.tokens import expiring_image_token_generator
 from src import REDIS
-from typing import Iterator
+from typing import Iterator, Union
+from django.urls import reverse
 import os
 
 
@@ -29,6 +31,7 @@ class ImageSerializer(serializers.ModelSerializer):
         model = models.Image
         fields = (
             "name",
+            "uuid",
             "uploaded_at",
             "og_file",
             "thumbnails",
@@ -39,6 +42,67 @@ class ImageSerializer(serializers.ModelSerializer):
             "og_file",
             "thumbnails",
         )
+
+
+class ExpiringImageSerializer(serializers.Serializer):
+    """
+    Serializer used to create an expiring image link
+    """
+
+    expiring_image_token_generator = expiring_image_token_generator
+
+    # fields
+    uuid = serializers.UUIDField(required=True, write_only=True)
+    expire_time = serializers.IntegerField(required=True)
+    url = serializers.URLField(required=False, read_only=True)
+
+    class Meta:
+        fields = (
+            "uuid",
+            "expire_time",
+            "url",
+        )
+        read_only_fields = ("url",)
+
+    def validate_expire_time(self, value: int) -> Union[int, None]:
+        """Check if expire time is in range 300 - 30000"""
+
+        if not (300 <= value <= 30000):
+            raise serializers.ValidationError(
+                "'expire_time' must be in range 300, 30000"
+            )
+
+        return value
+
+    def generate_expire_img_url(self, token: str, filename: str) -> str:
+        """Method used to generate expire image url. Returns absolute
+        url if request in context otherwise returns relative path"""
+
+        url = reverse(
+            "images:image_expiring", kwargs={"token": token, "path": filename}
+        )
+
+        if "request" in self.context:
+            return self.context["request"].build_absolute_uri(url)
+
+        return url
+
+    def create_expiring_img_link(self, image: models.Image) -> None:
+        """Generate expiring img link"""
+
+        if not image.og_file:
+            raise exceptions.NotFound(
+                "File for image with specified uuid does not exist. "
+                "Make sure that 'og_file' for image with specified 'uuid' exists"
+            )
+
+        filename = image.og_file.name
+        token = self.expiring_image_token_generator.make_token(
+            filename, self.validated_data["expire_time"]
+        )
+
+        url = self.generate_expire_img_url(token=token, filename=filename)
+        self._validated_data.update({"url": url})
 
 
 class ImageCreateSerializer(serializers.ModelSerializer):
@@ -58,6 +122,7 @@ class ImageCreateSerializer(serializers.ModelSerializer):
         model = models.Image
         fields = (
             "name",
+            "uuid",
             "uploaded_at",
             "file",
             "og_file",
