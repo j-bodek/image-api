@@ -1,23 +1,13 @@
+from .thumbnail import ThumbnailSerializer
 from rest_framework import serializers, exceptions
 from django.contrib.auth import get_user_model
 from core import models, validators
-from images.tasks import thumbnails_creator
+from images.tasks.registry import thumbnails_creator
 from images.tokens import expiring_image_token_generator
 from src import REDIS
 from typing import Iterator, Union
 from django.urls import reverse
 import os
-
-
-class ThumbnailSerializer(serializers.ModelSerializer):
-    """
-    Class used as Thumbnail Serializer
-    """
-
-    class Meta:
-        model = models.Thumbnail
-        fields = ("image", "height", "width", "file")
-        extra_kwargs = {"image": {"write_only": True}}
 
 
 class ImageSerializer(serializers.ModelSerializer):
@@ -26,6 +16,9 @@ class ImageSerializer(serializers.ModelSerializer):
     """
 
     thumbnails = ThumbnailSerializer(many=True, read_only=True)
+    can_fetch_expiring_image = serializers.BooleanField(
+        source="uploaded_by.tier.can_generate_expire_link"
+    )
 
     class Meta:
         model = models.Image
@@ -33,12 +26,14 @@ class ImageSerializer(serializers.ModelSerializer):
             "name",
             "uuid",
             "uploaded_at",
+            "can_fetch_expiring_image",
             "og_file",
             "thumbnails",
         )
         read_only_fields = (
             "name",
             "uploaded_at",
+            "can_fetch_expiring_image",
             "og_file",
             "thumbnails",
         )
@@ -116,6 +111,9 @@ class ImageCreateSerializer(serializers.ModelSerializer):
         validators=[validators.img_extension_validator],
         required=True,
     )
+    can_fetch_expiring_image = serializers.BooleanField(
+        source="uploaded_by.tier.can_generate_expire_link"
+    )
     thumbnails = serializers.SerializerMethodField()
 
     class Meta:
@@ -125,16 +123,18 @@ class ImageCreateSerializer(serializers.ModelSerializer):
             "uuid",
             "uploaded_at",
             "file",
+            "can_fetch_expiring_image",
             "og_file",
             "thumbnails",
         )
         read_only_fields = (
             "uploaded_at",
+            "can_fetch_expiring_image",
             "og_file",
             "thumbnails",
         )
 
-    def get_thumbnails(self, obj: models.Image) -> dict:
+    def get_thumbnails(self, obj: Union[models.Image, None]) -> Iterator:
         """Return serialized thumbnails data"""
 
         if not obj:
@@ -143,7 +143,7 @@ class ImageCreateSerializer(serializers.ModelSerializer):
         try:
             self.validated_data["thumbnails"]
         except (KeyError, AssertionError):
-            # if data wasn't validated yet or thumbnails doens't exists
+            # if data wasn't validated yet or thumbnails doesn't exists
             return []
 
         for data in self.validated_data["thumbnails"]:

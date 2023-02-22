@@ -58,7 +58,7 @@ class ImageResizer:
         image = PILImage.open(io.BytesIO(image))
 
         if None not in [height, width]:
-            image.resize((width, height), PILImage.ANTIALIAS)
+            image = image.resize((width, height), PILImage.ANTIALIAS)
         elif [height, width].count(None) == 1:
             scale_ratio = self.__get_resize_ratio(image.size, height, width)
             image = image.resize(

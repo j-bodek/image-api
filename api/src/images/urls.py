@@ -14,7 +14,7 @@ urlpatterns = [
         name="image_expiring_create",
     ),
     re_path(
-        r"^image/expiring/(?P<token>(?:[a-zA-Z0-9_-]{4})*(?:[a-zA-Z0-9_-]{2}==|[a-zA-Z0-9_-]{3}=|[a-zA-Z0-9_-]{4}))/(?P<path>.*)$",
+        r"^image/expiring/(?P<token>(?:[a-zA-Z0-9_-]{4})*(?:[a-zA-Z0-9_-]{2}==|[a-zA-Z0-9_-]{3}=|[a-zA-Z0-9_-]{4}))/(?P<path>.*)$",  # noqa
         img_views.ExpiringImageView.as_view(),
         name="image_expiring",
     ),

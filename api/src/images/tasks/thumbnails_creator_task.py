@@ -1,9 +1,10 @@
-import celery
-import logging
-from typing import Union
 from django.core.files.base import ContentFile
 from images.resizer import ImageResizer
-from src import CELERY_APP, REDIS
+from images.serializers.thumbnail import ThumbnailSerializer
+from src import REDIS
+from typing import Union
+import logging
+import celery
 
 
 class ThumbnailsCreator(celery.Task):
@@ -19,30 +20,38 @@ class ThumbnailsCreator(celery.Task):
         image_uuid: str,  # uuid to image model instance and to redis image data
         # in format [{"height":height, "width":width, "file":filename}]
         thumbnails_data: list[dict[str, Union[str, int, None]]],
-        **context,  # any additional kwargs will be treated as email context
+        **kwargs,  # any additional kwargs
     ) -> None:
         """This method should define body of the task executed by workers"""
-        from images.serializers import ThumbnailSerializer
 
         try:
             image_resizer = ImageResizer(
                 image_uuid=image_uuid, thumbnails_data=thumbnails_data
             )
             for filename, size, img_bytes in image_resizer.resize():
-                image = ContentFile(img_bytes, name=filename)
-                serializer = ThumbnailSerializer(
-                    data={
-                        "image": image_uuid,
-                        "height": size["height"],
-                        "width": size["width"],
-                        "file": image,
-                    }
-                )
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
+                self.save_image(image_uuid, filename, size, img_bytes)
+        except Exception:
+            logging.exception("message")
         finally:
             # make sure that cached image is deleted from redis
             REDIS.delete(image_uuid)
+
+    def save_image(
+        self, image_uuid: str, filename: str, size: dict[str:int], img_bytes: bytes
+    ) -> None:
+        """Create ContentFile and save Thumbnail"""
+
+        image = ContentFile(img_bytes, name=filename)
+        serializer = ThumbnailSerializer(
+            data={
+                "image": image_uuid,
+                "height": size["height"],
+                "width": size["width"],
+                "file": image,
+            }
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         """This method is called when task fails"""
@@ -51,6 +60,3 @@ class ThumbnailsCreator(celery.Task):
             f"{task_id} failed: {exc}\n",
             f"Failed to create thumbnails for image with uuid '{kwargs.get('image_uuid')}'\n",  # noqa
         )
-
-
-thumbnails_creator = CELERY_APP.register_task(ThumbnailsCreator())

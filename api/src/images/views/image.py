@@ -1,11 +1,12 @@
 from rest_framework import generics, permissions, status, exceptions
 from rest_framework.response import Response
-from images.serializers import ImageCreateSerializer, ExpiringImageSerializer
+from images.serializers.image import ImageCreateSerializer, ExpiringImageSerializer
 from images.permissions import IsImageOwner, IsExpiringImageTokenValid
+from django.core.exceptions import Http404
+from django.views.static import serve
+from django.conf import settings
 from core.models import Image
 from typing import Union
-from django.conf import settings
-from django.views.static import serve
 
 
 class ImageUploadView(generics.CreateAPIView):
@@ -43,7 +44,7 @@ class GenerateExpiringImageView(generics.CreateAPIView):
 
         try:
             obj = generics.get_object_or_404(Image, uuid=self.request.data["uuid"])
-        except:
+        except Http404:
             raise exceptions.NotFound("Image with specified uuid does not exist")
 
         # May raise a permission denied

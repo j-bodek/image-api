@@ -1,5 +1,5 @@
 from rest_framework import generics, permissions
-from images.serializers import ImageSerializer
+from images.serializers.image import ImageSerializer
 from core.models import Image
 from django.db.models.query import QuerySet
 

@@ -14,7 +14,7 @@ class TestUser(HttpUser):
 
     @task
     def hello_world(self):
-        file = open("test/image.jpeg", "rb")
+        file = open("load-test/image.jpeg", "rb")
         self.client.post(
             "/api/image/upload/",
             {"name": "testfile"},

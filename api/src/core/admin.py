@@ -11,7 +11,13 @@ class UserAdmin(BaseUserAdmin):
     """
 
     ordering = ["date_joined"]
-    list_display = ["username", "email", "tier"]
+    list_display = [
+        "username",
+        "email",
+        "tier",
+        "last_login_humanize",
+        "date_joined_humanize",
+    ]
     fieldsets = (
         (
             None,

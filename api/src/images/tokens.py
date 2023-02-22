@@ -3,6 +3,7 @@ from django.utils.crypto import constant_time_compare, salted_hmac
 from django.utils.http import base36_to_int, int_to_base36
 import datetime
 import base64
+import binascii
 
 
 class ExpiringImageTokenGenerator(PasswordResetTokenGenerator):
@@ -35,10 +36,10 @@ class ExpiringImageTokenGenerator(PasswordResetTokenGenerator):
             return False
 
         # Parse the token
-        token = base64.urlsafe_b64decode(token.encode()).decode("utf-8")
         try:
+            token = base64.urlsafe_b64decode(token.encode()).decode("utf-8")
             ts_b36, _ = token.split("-")
-        except ValueError:
+        except (binascii.Error, ValueError):
             return False
 
         try:
