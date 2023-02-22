@@ -2,6 +2,10 @@ version: 2.1
 orbs:
   python: circleci/python@1.5.0
 
+services:
+  redis_db:
+    image: cimg/redis:7.0.5
+
 jobs:
   build-and-test:
     docker:
@@ -26,6 +30,18 @@ jobs:
       - python/install-packages:
           pip-dependency-file: api/requirements.dev.txt
           pkg-manager: pip
+      - run:
+          name: Install Redis
+          command: |
+            sudo apt-get install -y redis-server
+      - run:
+          name: Start Redis
+          command: redis-server --save 20 1 --loglevel warning --port 6379 --requirepass dev_redispass --daemonize yes
+      - run:
+          name: Wait for Redis
+          command: |
+            set -e
+            until redis-cli ping; do sleep 1; done
       - run:
           command: |
             python3 -m venv venv

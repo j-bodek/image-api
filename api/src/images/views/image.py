@@ -2,9 +2,9 @@ from rest_framework import generics, permissions, status, exceptions
 from rest_framework.response import Response
 from images.serializers.image import ImageCreateSerializer, ExpiringImageSerializer
 from images.permissions import IsImageOwner, IsExpiringImageTokenValid
-from django.core.exceptions import Http404
 from django.views.static import serve
 from django.conf import settings
+from django.http import Http404
 from core.models import Image
 from typing import Union
 
